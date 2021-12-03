@@ -1,0 +1,6 @@
+[submodule "thirdparty/pico-sdk"]
+	path = thirdparty/pico-sdk
+	url = https://github.com/raspberrypi/pico-sdk.git
+[submodule "thirdparty/zstd"]
+	path = thirdparty/zstd
+	url = https://github.com/facebook/zstd.git
