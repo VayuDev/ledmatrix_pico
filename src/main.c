@@ -79,16 +79,24 @@ start:
 
 void reconnect_wifi(NetCtx *ctx, void* user) {
     sleep_ms(2000);
-    printf("Now trying to connect to WiFi...\n");
+    printf("Closing old connection...\n");
+    esp_send_at_command_expect(ctx, "AT\r\n", "OK\r\n");
+    printf("Status check worked\n");
+    esp_send_at_command_expect(ctx, "AT+CWQAP\r\n", "OK\r\n");
     while(true) {
         printf("Trying to (re)connect wifi...\n");
+        ctx->connectingWifi = true;
         if(esp_send_at_command_expect(ctx, "AT+CWJAP_CUR=\"" WIFI_NAME "\",\"" WIFI_PASSWORD "\"\r\n", "OK\r\n")) {
+            ctx->connectingWifi = false;
             break;
         }
+        ctx->connectingWifi = false;
         sleep_ms(1000);
     }
     sleep_ms(1000);
     printf("(Re)Connected wifi!\n");
+
+    reconnect_tcp(ctx, user);
 }
 
 void second_core_func() {
@@ -104,7 +112,7 @@ void second_core_func() {
 
     esp_setup(ctx);
     reconnect_wifi(ctx, ctx->user);
-    reconnect_tcp(ctx, ctx->user);
+    //reconnect_tcp(ctx, ctx->user);
     printf("TCP connected, sleeping now for 500ms\n");
     sleep_ms(500);
 
@@ -116,7 +124,7 @@ void second_core_func() {
     }
 }
 
-uint32_t CORE1_STACK[(20 * 1024)/4];
+uint32_t CORE1_STACK[(24 * 1024)/4];
 
 int main() {
     stdio_init_all();

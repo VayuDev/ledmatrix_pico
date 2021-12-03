@@ -2,8 +2,8 @@
 
 
 size_t esp_receive_response(NetCtx *ctx, uint8_t *dst, size_t dstLen) {
-    const size_t recvBufferMaxSize = 1024 * 4;
-    uint8_t recvBuffer[1024 * 4];
+    const size_t recvBufferMaxSize = 1024 * 2;
+    uint8_t recvBuffer[1024 * 2];
 
     enum State {
         NEW_LINE,
@@ -122,9 +122,13 @@ size_t esp_receive_response(NetCtx *ctx, uint8_t *dst, size_t dstLen) {
                     if(ctx->onConnectionClose && !ctx->connectingTcp) {
                         ctx->onConnectionClose(ctx, ctx->user);
                     }
-                } else if(memcmp(recvBuffer + lastLineStart, "WIFI DISCONNECT\r\n", responseLength - lastLineStart) == 0) {
+                } else if(memcmp(recvBuffer + lastLineStart, "WIFI DISCONNECT\r\n", responseLength - lastLineStart) == 0
+                || memcmp(recvBuffer + lastLineStart, "DNS Fail\r\n", responseLength - lastLineStart) == 0) {
+                    printf("WiFi disconnected...\n");
                     if(ctx->onWifiDisconnect && !ctx->connectingWifi) {
                         ctx->onWifiDisconnect(ctx, ctx->user);
+                    } else {
+                        printf("Ignoring\n");
                     }
                 } else {
                     /*printf("Matching:\n");
@@ -154,12 +158,10 @@ size_t esp_send_at_command(NetCtx *ctx, const char *command, uint8_t *response, 
 }
 
 bool esp_send_at_command_expect(NetCtx *ctx, const char *command, const char *expectedResult) {
-    ctx->connectingWifi = true;
     size_t expectedResultLen = strlen(expectedResult);
     char result[expectedResultLen + 1];
     size_t bytesReceived = esp_send_at_command(ctx, command, result, expectedResultLen);
     result[bytesReceived] = 0;
-    ctx->connectingWifi = false;
     if(bytesReceived != expectedResultLen || memcmp(expectedResult, result, expectedResultLen) != 0) {
         printf("AT Command '%s'; expected '%s', got '%s' (%i)\n", command, expectedResult, result, (int)bytesReceived);
         fflush(stdout);
@@ -200,7 +202,7 @@ bool esp_send_tcp_data(NetCtx *ctx, const uint8_t *data, size_t len) {
 }
 
 void esp_setup(NetCtx* ctx) {
-    uart_init(uart0, 119200);
+    uart_init(uart0, 115200);
     gpio_set_function(16, GPIO_FUNC_UART);
     gpio_set_function(17, GPIO_FUNC_UART);
     uart_set_format(uart0, 8, 1, UART_PARITY_NONE);
@@ -212,14 +214,14 @@ void esp_setup(NetCtx* ctx) {
     printf("ESP-01 reset\n");
     sleep_ms(500);
 
-    const char* setBaudRate = "AT+UART_CUR=119200,8,1,0,0\r\n";
+    const char* setBaudRate = "AT+UART_CUR=115200,8,1,0,0\r\n";
     uart_write_blocking(uart0, setBaudRate, strlen(setBaudRate));
     esp_receive_response(ctx, NULL, 0);
     uart_deinit(uart0);
-    uart_init(uart0, 119200);
+    uart_init(uart0, 115200);
     uart_set_format(uart0, 8, 1, UART_PARITY_NONE);
     uart_set_translate_crlf(uart0, false);
-    printf("ESP-01 now running at 119200 baud\n");
+    printf("ESP-01 now running at 115200 baud\n");
 
     sleep_ms(500);
 
