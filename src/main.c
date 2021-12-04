@@ -57,46 +57,81 @@ void received_packet(NetCtx *ctx, uint8_t* data, size_t len, void* user) {
     *currentBuffer = !*currentBuffer;
 }
 
-void reconnect_tcp(NetCtx *ctx, void* user) {
+void clear_screen(int *currentBuffer) {
+    memset(buffers[*currentBuffer], 0, sizeof(buffers[*currentBuffer]));
+    multicore_fifo_push_blocking(*currentBuffer);
+    multicore_fifo_pop_blocking();
+    *currentBuffer = !*currentBuffer;
+}
+
+void show_loading_animation(int* currentBuffer, int index, uint8_t colorOffset) {
+    memset(buffers[*currentBuffer], 0, sizeof(buffers[*currentBuffer]));
+    buffers[*currentBuffer][index % sizeof(buffers[*currentBuffer])] = 255 << (colorOffset * 8);
+    multicore_fifo_push_blocking(*currentBuffer);
+    multicore_fifo_pop_blocking();
+    *currentBuffer = !*currentBuffer;
+}
+
+bool send_greeting(NetCtx* ctx) {
+    clear_screen(ctx->user);
+    const char* greeting = "S38:SIMPLIFIED-SBC-MQTT-CLIENT-PICO-MATRIX";
+    if(!esp_send_tcp_data(ctx, greeting, strlen(greeting))) {
+        printf("Failed to send hello\n");
+        return false;
+    }
+    printf("Sending greeting success!\n");
+    return true;
+}
+
+// These two function are super messy. This is due to the fact that a) we can't do recursion but b) at any point, we
+// can get notified that the wifi or tcp connection dropped c) i'm to lazy to clean it up.
+// If wifi drops, we have to reconnect tcp as well, but what if wifi drops again? As we can't do recursion (limited stack space),
+// we need to save that error (ctx->wifiErrorButStillinWifiConnect = true), return it one layer up and reconnect there.
+bool reconnect_tcp(NetCtx *ctx, void* user) {
 start:
     esp_send_at_command_expect(ctx, "AT+CIPCLOSE\r\n", "OK\r\n");
+    int tries = 0;
     while(true) {
         printf("Trying to (re)connect tcp...\n");
         if(esp_connect(ctx, "sauron", 1883)) {
             break;
         }
+        if(ctx->wifiErrorButStillinWifiConnect) {
+            return false;
+        }
         printf("Connection attempt failed\n");
+        show_loading_animation(user, tries++, 1);
         sleep_ms(1000);
     }
     printf("(Re)Connected tcp!\n");
-    const char* greeting = "S38:SIMPLIFIED-SBC-MQTT-CLIENT-PICO-MATRIX";
-    if(!esp_send_tcp_data(ctx, greeting, strlen(greeting))) {
-        printf("Failed to send hello\n");
+    if(!send_greeting(ctx))
         goto start;
-    }
-    printf("Sending greeting success!\n");
+
+    return true;
 }
 
 void reconnect_wifi(NetCtx *ctx, void* user) {
     sleep_ms(2000);
-    printf("Closing old connection...\n");
-    esp_send_at_command_expect(ctx, "AT\r\n", "OK\r\n");
-    printf("Status check worked\n");
-    esp_send_at_command_expect(ctx, "AT+CWQAP\r\n", "OK\r\n");
+start:
+    ctx->connectingWifi = true;
+    int tries = 0;
     while(true) {
         printf("Trying to (re)connect wifi...\n");
-        ctx->connectingWifi = true;
+        esp_send_at_command_expect(ctx, "AT+CWQAP\r\n", "OK\r\n");
         if(esp_send_at_command_expect(ctx, "AT+CWJAP_CUR=\"" WIFI_NAME "\",\"" WIFI_PASSWORD "\"\r\n", "OK\r\n")) {
-            ctx->connectingWifi = false;
             break;
         }
-        ctx->connectingWifi = false;
+        show_loading_animation(user, tries++, 0);
         sleep_ms(1000);
     }
     sleep_ms(1000);
     printf("(Re)Connected wifi!\n");
 
-    reconnect_tcp(ctx, user);
+    // avoid recursion here
+    if(!reconnect_tcp(ctx, user))
+        goto start;
+
+    ctx->connectingWifi = false;
 }
 
 void second_core_func() {
@@ -116,9 +151,7 @@ void second_core_func() {
     printf("TCP connected, sleeping now for 500ms\n");
     sleep_ms(500);
 
-
-    multicore_fifo_push_blocking(0);
-
+    printf("Init done, starting buisness logic!\n");
     while(true) {
         esp_receive_response(ctx, NULL, 0);
     }
@@ -136,9 +169,7 @@ int main() {
     memset(buffers, 10, sizeof(buffers));
 
     multicore_launch_core1_with_stack(second_core_func, CORE1_STACK, sizeof(CORE1_STACK));
-    multicore_fifo_pop_blocking();
 
-    printf("Init done, starting buisness logic!\n");
 
     PIO pio = pio0;
     uint sm_data = 0;

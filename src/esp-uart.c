@@ -2,6 +2,7 @@
 
 
 size_t esp_receive_response(NetCtx *ctx, uint8_t *dst, size_t dstLen) {
+    ctx->wifiErrorButStillinWifiConnect = false;
     const size_t recvBufferMaxSize = 1024 * 2;
     uint8_t recvBuffer[1024 * 2];
 
@@ -119,15 +120,17 @@ size_t esp_receive_response(NetCtx *ctx, uint8_t *dst, size_t dstLen) {
                    || memcmp(recvBuffer + lastLineStart, "SEND FAIL\r\n", responseLength - lastLineStart) == 0) {
                     break;
                 } else if(memcmp(recvBuffer + lastLineStart, "CLOSED\r\n", responseLength - lastLineStart) == 0) {
-                    if(ctx->onConnectionClose && !ctx->connectingTcp) {
+                    if(ctx->onConnectionClose && !ctx->connectingTcp && !ctx->connectingWifi) {
                         ctx->onConnectionClose(ctx, ctx->user);
                     }
                 } else if(memcmp(recvBuffer + lastLineStart, "WIFI DISCONNECT\r\n", responseLength - lastLineStart) == 0
-                || memcmp(recvBuffer + lastLineStart, "DNS Fail\r\n", responseLength - lastLineStart) == 0) {
+                   || memcmp(recvBuffer + lastLineStart, "DNS Fail\r\n", responseLength - lastLineStart) == 0
+                   || memcmp(recvBuffer + lastLineStart, "no ip\r\n", responseLength - lastLineStart) == 0) {
                     printf("WiFi disconnected...\n");
                     if(ctx->onWifiDisconnect && !ctx->connectingWifi) {
                         ctx->onWifiDisconnect(ctx, ctx->user);
                     } else {
+                        ctx->wifiErrorButStillinWifiConnect = true;
                         printf("Ignoring\n");
                     }
                 } else {

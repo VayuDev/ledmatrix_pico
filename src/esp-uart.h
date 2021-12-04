@@ -30,6 +30,7 @@ struct NetCtx {
     void* user;
     bool connectingTcp;
     bool connectingWifi;
+    bool wifiErrorButStillinWifiConnect;
     void (*handlePacket)(NetCtx *ctx, uint8_t* data, size_t dataLen, void* user);
     void (*onConnectionClose)(NetCtx *ctx, void* user);
     void (*onWifiDisconnect)(NetCtx *ctx, void* user);
