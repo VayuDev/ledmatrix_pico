@@ -182,6 +182,9 @@ bool esp_connect(NetCtx *ctx, const char *remoteIp, uint16_t remotePort) {
     buffer[bytesReceived] = 0;
     if(memcmp("OK\r\n", buffer, 4) == 0 || strstr(buffer, "ALREADY CONNECTED") != NULL) {
         printf("connect ok\n");
+        ctx->state = RECEIVING_S;
+        ctx->recvLength = 0;
+        ctx->receiveBufferOffset = 0;
         return true;
     }
     printf("connect failed\n");
@@ -217,14 +220,14 @@ void esp_setup(NetCtx* ctx) {
     printf("ESP-01 reset\n");
     sleep_ms(500);
 
-    const char* setBaudRate = "AT+UART_CUR=115200,8,1,0,0\r\n";
+    const char* setBaudRate = "AT+UART_CUR=80000,8,1,0,0\r\n";
     uart_write_blocking(uart0, setBaudRate, strlen(setBaudRate));
     esp_receive_response(ctx, NULL, 0);
     uart_deinit(uart0);
-    uart_init(uart0, 115200);
+    uart_init(uart0, 80000);
     uart_set_format(uart0, 8, 1, UART_PARITY_NONE);
     uart_set_translate_crlf(uart0, false);
-    printf("ESP-01 now running at 115200 baud\n");
+    printf("ESP-01 now running at 80000 baud\n");
 
     sleep_ms(500);
 

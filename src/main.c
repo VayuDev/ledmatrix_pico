@@ -157,7 +157,7 @@ void second_core_func() {
     }
 }
 
-uint32_t CORE1_STACK[(24 * 1024)/4];
+uint32_t CORE1_STACK[(30 * 1024)/4];
 
 int main() {
     stdio_init_all();

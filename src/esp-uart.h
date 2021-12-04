@@ -23,7 +23,7 @@ typedef enum RecvState {
 struct NetCtx;
 typedef struct NetCtx NetCtx;
 struct NetCtx {
-    uint8_t receiveBuffer[10 * 1024];
+    uint8_t receiveBuffer[13 * 1024];
     size_t receiveBufferOffset;
     size_t recvLength;
     RecvState state;
