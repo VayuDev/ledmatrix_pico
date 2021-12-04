@@ -1,6 +1,6 @@
 # Program for driving a 64x32 HUB75 LED Matrix using a Raspberry Pi Pico over WiFi
 
-This repository contains the code for driving a 64x32 HUB75 LED Matrix like those solt by
+This repository contains the code for driving a 64x32 HUB75 LED Matrix like those sold by
 adafruit over WiFi with a Raspberry Pi Pico. For WiFi a ESP-01s is used. The communication protocol is
 custom to simplify the code and the frames are compressed using ZSTD to increase throughput. It's possible
 to achieve around 28 FPS. Please see my 
